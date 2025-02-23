@@ -7,7 +7,7 @@ import pandas as pd
 import gym
 from gym import spaces
 import tensorflow as tf
-from tensorflow.keras import layers, models, optimizers # type: ignore
+from tensorflow.keras import layers, models, optimizers  # type: ignore
 from collections import defaultdict
 from tqdm import trange
 
@@ -20,19 +20,19 @@ def gather_team_cycle_data(data):
     Aggregate cycle data per team from raw scouting entries.
     Computes averages for auto/tele corals, algae, reef removal, climbs, etc.
     """
-    end_map = {"No":0, "Fs":0, "Fd":0, "P":2, "Sc":6, "Dc":12}
-    base = defaultdict(lambda:{
-        "sumAutoC":0.0, 
-        "sumTeleC":0.0,
-        "sumAutoA":0.0,
-        "sumTeleA":0.0,
-        "sumReef":0.0,
-        "sumClimbs":0.0,
-        "sumEndg":0.0,
-        "autoMoves":0,
-        "matches":0,
-        "sumBarge":0.0,
-        "sumProc":0.0
+    end_map = {"No": 0, "Fs": 0, "Fd": 0, "P": 2, "Sc": 6, "Dc": 12}
+    base = defaultdict(lambda: {
+        "sumAutoC": 0.0, 
+        "sumTeleC": 0.0,
+        "sumAutoA": 0.0,
+        "sumTeleA": 0.0,
+        "sumReef": 0.0,
+        "sumClimbs": 0.0,
+        "sumEndg": 0.0,
+        "autoMoves": 0,
+        "matches": 0,
+        "sumBarge": 0.0,
+        "sumProc": 0.0
     })
     for row in data:
         if row.get("noShow"):
@@ -40,21 +40,21 @@ def gather_team_cycle_data(data):
         t = row["teamNumber"]
         base[t]["matches"] += 1
         # auto & tele corals
-        aC = row.get("L1sc",0)+ row.get("L2sc",0)+ row.get("L3sc",0)+ row.get("L4sc",0)
-        tC = row.get("tL1sc",0)+ row.get("tL2sc",0)+ row.get("tL3sc",0)+ row.get("tL4sc",0)
+        aC = row.get("L1sc", 0) + row.get("L2sc", 0) + row.get("L3sc", 0) + row.get("L4sc", 0)
+        tC = row.get("tL1sc", 0) + row.get("tL2sc", 0) + row.get("tL3sc", 0) + row.get("tL4sc", 0)
         base[t]["sumAutoC"] += aC
         base[t]["sumTeleC"] += tC
         # auto & tele algae (barge: ScAb/ tScAb; processor: ScAp/ tScAp)
-        ab = row.get("ScAb",0)
-        ap = row.get("ScAp",0)
-        tb = row.get("tScAb",0)
-        tp = row.get("tScAp",0)
+        ab = row.get("ScAb", 0)
+        ap = row.get("ScAp", 0)
+        tb = row.get("tScAb", 0)
+        tp = row.get("tScAp", 0)
         base[t]["sumAutoA"] += (ab + ap)
         base[t]["sumTeleA"] += (tb + tp)
         base[t]["sumBarge"] += (ab + tb)
         base[t]["sumProc"] += (ap + tp)
         # reef removal
-        rr = row.get("RmAr",0)+ row.get("RmAg",0)+ row.get("tRmAr",0)+ row.get("tRmAg",0)
+        rr = row.get("RmAr", 0) + row.get("RmAg", 0) + row.get("tRmAr", 0) + row.get("tRmAg", 0)
         base[t]["sumReef"] += rr
         # climbs/endgame from 'epo'
         ep = end_map.get(row.get("epo", "No"), 0)
@@ -81,7 +81,7 @@ def gather_team_cycle_data(data):
         fracMv = d["autoMoves"] / m
         bar = d["sumBarge"] / m
         pro = d["sumProc"] / m
-        cycUnits = 0.75*(aC + tC) + 1.0*(aA + tA) + 0.225*rr + 3*cl
+        cycUnits = 0.75 * (aC + tC) + 1.0 * (aA + tA) + 0.225 * rr + 3 * cl
         x_i = 150.0 / cycUnits if cycUnits > 1e-9 else 999.0
         final[t] = {
             "avgAutoCor": aC,
@@ -173,14 +173,14 @@ def parallel_time_for_alliance(corals, algae, reefRemoval, climbs, allianceInfo)
 def rp_conditions(allianceInfo, c4, c3, c2, c1, bar, proc):
     """
     Determine the partial ranking points (RP) conditions.
-      - autoRP: if min fraction moved ≥ 0.5 and some auto coral exists
-      - coralRP: if each level’s count ≥ threshold (3 if proc ≥2, else 5)
-      - bargeRP: if 4*barge + sumEndg ≥ 14
+      - autoRP: if minimum fraction moved ≥ 0.5 and there is some auto coral
+      - coralRP: if each level’s count is ≥ threshold (3 if proc ≥ 2, else 5)
+      - bargeRP: now counts only the endgame (climb) points; i.e., if sumEndg ≥ 14.
     """
     rp_auto = 1 if (allianceInfo["minFracMove"] >= 0.5 and (allianceInfo["sumAutoCor"] > 0)) else 0
     thresh = 3 if proc >= 2 else 5
     rp_coral = 1 if (c4 >= thresh and c3 >= thresh and c2 >= thresh and c1 >= thresh) else 0
-    rp_barge = 1 if (4 * bar + allianceInfo["sumEndg"] >= 14) else 0
+    rp_barge = 1 if (allianceInfo["sumEndg"] >= 14) else 0
     return rp_auto, rp_coral, rp_barge
 
 ##############################################
@@ -217,8 +217,8 @@ def compute_alliance_score_points(allianceInfo, R):
         return -100, 0, {"AllianceTime": allianceTime}
     frac_auto = allianceInfo["sumAutoAll"] / usedCor if usedCor > 1e-9 else 0
     def blend(level):
-        auto_mult = {"L4":7, "L3":6, "L2":4, "L1":3}
-        tele_mult = {"L4":5, "L3":4, "L2":3, "L1":2}
+        auto_mult = {"L4": 7, "L3": 6, "L2": 4, "L1": 3}
+        tele_mult = {"L4": 5, "L3": 4, "L2": 3, "L1": 2}
         return frac_auto * auto_mult[level] + (1 - frac_auto) * tele_mult[level]
     c_pts = c4 * blend("L4") + c3 * blend("L3") + c2 * blend("L2") + c1 * blend("L1")
     a_pts = proc * 6  # processor gives 6 points per unit
@@ -267,8 +267,8 @@ def compute_alliance_score_rp(allianceInfo, R, must_proc):
     if final_time > 150:
         return -100, -100, {"AllianceTime": final_time}
     def blend(level):
-        autoMult = {"L4":7, "L3":6, "L2":4, "L1":3}
-        teleMult = {"L4":5, "L3":4, "L2":3, "L1":2}
+        autoMult = {"L4": 7, "L3": 6, "L2": 4, "L1": 3}
+        teleMult = {"L4": 5, "L3": 4, "L2": 3, "L1": 2}
         return frac_auto * autoMult[level] + (1 - frac_auto) * teleMult[level]
     coralPts = c4 * blend("L4") + c3 * blend("L3") + c2 * blend("L2") + c1 * blend("L1")
     algaePts = bar * 4 + proc * 6
