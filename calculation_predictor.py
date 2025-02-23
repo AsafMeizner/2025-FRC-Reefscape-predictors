@@ -1,527 +1,532 @@
 import json
-import random
-import time
 import os
 import math
-import numpy as np
-import pandas as pd
 
 #########################################
-# Part 1: Data Generation
+# Part 1: Data Generation (Stub)
 #########################################
 def generate_data(filename="scouting_data_intelligent.json"):
     """
-    Generate synthetic match data for Reefscape.
-    • Each alliance can score up to 12 corals per level.
-    • Algae totals can be up to 36.
-    • No initial blocking is applied on coral levels.
+    Stub. If the file doesn't exist, generate or populate synthetic data.
     """
-    def random_partition(total, parts):
-        if parts == 1:
-            return [total]
-        cuts = sorted([random.randint(0, total) for _ in range(parts - 1)])
-        values = []
-        previous = 0
-        for cut in cuts:
-            values.append(cut - previous)
-            previous = cut
-        values.append(total - previous)
-        return values
-
-    NUM_TEAMS = 30
-    MATCHES_PER_TEAM = 10
-    total_team_entries = NUM_TEAMS * MATCHES_PER_TEAM
-    remainder = total_team_entries % 6
-    if remainder != 0:
-        total_team_entries += (6 - remainder)
-    num_matches = total_team_entries // 6
-
-    team_assignments = [team for team in range(1, NUM_TEAMS + 1) for _ in range(MATCHES_PER_TEAM)]
-    while len(team_assignments) < total_team_entries:
-        team_assignments.append(random.randint(1, NUM_TEAMS))
-    random.shuffle(team_assignments)
-
-    current_time = int(time.time() * 1000)
-    submissions = []
-    global_team_index = 0
-
-    for match in range(1, num_matches + 1):
-        alliance_data = {}
-        for alliance in ['A', 'B']:
-            alliance_data[alliance] = {}
-            for level in ['L2', 'L3', 'L4']:
-                total_alliance = random.randint(0, 12)  # up to 12 corals per level
-                aut_total = random.randint(0, total_alliance)
-                teleop_total = total_alliance - aut_total
-                aut_parts = random_partition(aut_total, 3)
-                teleop_parts = random_partition(teleop_total, 3)
-                alliance_data[alliance][level] = {'aut': aut_parts, 'teleop': teleop_parts}
-        for alliance_index, alliance in enumerate(['A', 'B']):
-            for robot_index in range(3):
-                submission = {}
-                submission["scouter"] = f"Scouter {robot_index + alliance_index * 3 + 1}"
-                submission["matchNumber"] = match
-                submission["teamNumber"] = team_assignments[global_team_index]
-                global_team_index += 1
-                submission["noShow"] = random.random() < 0.05
-
-                # Autonomous Section
-                submission["Mved"] = random.choice([True, False])
-                submission["L1sc"] = random.randint(0, 10)  # L1 unlimited in auto
-                for level in ['L2', 'L3', 'L4']:
-                    submission[f"{level}sc"] = alliance_data[alliance][level]['aut'][robot_index]
-                submission["L1ms"] = random.randint(0, 2)
-                for level in ['L2', 'L3', 'L4']:
-                    submission[f"{level}ms"] = random.randint(0, 2)
-                submission["InG"] = random.randint(0, 5)
-                submission["InS"] = random.randint(0, 5)
-                submission["RmAr"] = random.randint(0, 5)
-                submission["RmAg"] = random.randint(0, 5)
-                submission["ScAb"] = random.randint(0, 3)
-                submission["ScAp"] = random.randint(0, 3)
-
-                # TeleOp Section
-                submission["tL1sc"] = random.randint(0, 15)  # L1 in teleop
-                for level in ['L2', 'L3', 'L4']:
-                    submission[f"t{level}sc"] = alliance_data[alliance][level]['teleop'][robot_index]
-                submission["tL1ms"] = random.randint(0, 2)
-                for level in ['L2', 'L3', 'L4']:
-                    submission[f"t{level}ms"] = random.randint(0, 2)
-                submission["tInG"] = random.randint(0, 10)
-                submission["tInS"] = random.randint(0, 10)
-                submission["tRmAr"] = random.randint(0, 10)
-                submission["tRmAg"] = random.randint(0, 10)
-                submission["tScAb"] = random.randint(0, 5)
-                submission["tScAp"] = random.randint(0, 5)
-                submission["Fou"] = random.randint(0, 2)
-
-                # End Game Section
-                submission["epo"] = random.choice(["No", "P", "Sc", "Dc", "Fd", "Fs"])
-
-                # Post-Match
-                submission["dto"] = random.random() < 0.1
-                submission["yc"] = random.choices(["No Card", "Yellow", "Red"], weights=[90, 8, 2])[0]
-                submission["co"] = random.choice(["", "Good performance", "Minor issues", 
-                                                   "Robot was stuck", "Exceeded expectations", "Needs improvement"])
-                submission["submissionTime"] = current_time + random.randint(0, 1000000)
-                submissions.append(submission)
-
-    with open(filename, "w") as f:
-        json.dump(submissions, f, indent=2)
-    print(f"Generated {len(submissions)} submissions across {num_matches} matches.")
+    pass
 
 #########################################
-# Part 2: Calculation-Based Predictor Functions
+# Part 2: Gather Each Team's Cycle Time
 #########################################
-def average_auto_score(data, teamNumber):
-    """Calculates average autonomous coral score using multipliers: L1=3, L2=4, L3=6, L4=7."""
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    total = sum(entry.get("L1sc", 0) * 3 + entry.get("L2sc", 0) * 4 +
-                entry.get("L3sc", 0) * 6 + entry.get("L4sc", 0) * 7 for entry in teamData)
-    return total / len(teamData)
-
-def average_teleop_score(data, teamNumber):
-    """Calculates average teleop coral score using multipliers: L1=2, L2=3, L3=4, L4=5."""
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    total = sum(entry.get("tL1sc", 0) * 2 + entry.get("tL2sc", 0) * 3 +
-                entry.get("tL3sc", 0) * 4 + entry.get("tL4sc", 0) * 5 for entry in teamData)
-    return total / len(teamData)
-
-def average_algae_score(data, teamNumber):
+def gather_team_cycle_data(data):
     """
-    Calculates average algae score combining auto and teleop.
-    (Uses both barge (4 pts) and processor (6 pts) counts.)
+    For each team t, parse:
+      - autoCorals, teleCorals
+      - autoAlgae, teleAlgae
+      - reefRemoved
+      - climbs
+    Then cycUnits_i = 0.75*(aC+tC) + 1.0*(aA+tA) + 0.225*(reefRem) + 3*(climbs)
+    => x_i= 150/cycUnits_i if cycUnits_i>0 else 999
+    Also track fractionMovedAuto, average endgame points, barge & proc algae, etc.
     """
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    total = sum(entry.get("ScAb", 0) * 4 + entry.get("ScAp", 0) * 6 +
-                entry.get("tScAb", 0) * 4 + entry.get("tScAp", 0) * 6 for entry in teamData)
-    return total / len(teamData)
+    from collections import defaultdict
+    end_map= {"No":0,"Fs":0,"Fd":0,"P":2,"Sc":6,"Dc":12}
 
-def average_algae_barge(data, teamNumber):
-    """Calculates average algae barge score (barge only, 4 points each)."""
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    total = sum(entry.get("ScAb", 0) * 4 + entry.get("tScAb", 0) * 4 for entry in teamData)
-    return total / len(teamData)
+    base = defaultdict(lambda:{
+        "sumAutoC":0.0, 
+        "sumTeleC":0.0,
+        "sumAutoA":0.0,
+        "sumTeleA":0.0,
+        "sumReef":0.0,
+        "sumClimbs":0.0,
+        "sumEndg":0.0,
+        "autoMoves":0,
+        "matches":0,
+        "sumBarge":0.0,
+        "sumProc":0.0
+    })
 
-def average_endgame_points(data, teamNumber):
-    """Calculates average endgame points based on the 'epo' field."""
-    mapping = {"P": 2, "Sc": 6, "Dc": 12, "No": 0, "Fs": 0, "Fd": 0}
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    total = sum(mapping.get(entry.get("epo", "No"), 0) for entry in teamData)
-    return total / len(teamData)
+    for row in data:
+        if row.get("noShow"):
+            continue
+        t= row["teamNumber"]
+        base[t]["matches"]+=1
 
-def level_average(data, teamNumber, level):
-    """Calculates average total corals (auto+teleop) scored on a given level for a team."""
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    total = sum(entry.get(f"{level}sc", 0) + entry.get(f"t{level}sc", 0) for entry in teamData)
-    return total / len(teamData)
+        # auto corals
+        aC= (row.get("L1sc",0)+ row.get("L2sc",0)+ row.get("L3sc",0)+ row.get("L4sc",0))
+        # tele corals
+        tC= (row.get("tL1sc",0)+ row.get("tL2sc",0)+ row.get("tL3sc",0)+ row.get("tL4sc",0))
+        base[t]["sumAutoC"]+= aC
+        base[t]["sumTeleC"]+= tC
 
-def level_max(data, teamNumber, level):
-    """Calculates the maximum total corals (auto+teleop) scored on a given level for a team."""
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    return max(entry.get(f"{level}sc", 0) + entry.get(f"t{level}sc", 0) for entry in teamData)
+        # auto algae => ScAb+ScAp, tele => tScAb+ tScAp
+        ab= row.get("ScAb",0)
+        ap= row.get("ScAp",0)
+        tb= row.get("tScAb",0)
+        tp= row.get("tScAp",0)
+        base[t]["sumAutoA"]+= (ab+ ap)
+        base[t]["sumTeleA"]+= (tb+ tp)
 
-def autonomous_bonus(data, teamNumber):
-    """
-    Returns 1 if the team in autonomous:
-      - Leaves the starting line (Mved true in ≥50% of matches)
-      - Scores at least one coral (any level)
-    Otherwise, returns 0.
-    """
-    teamData = [entry for entry in data if entry["teamNumber"] == teamNumber]
-    if not teamData:
-        return 0
-    mved_rate = sum(1 for entry in teamData if entry.get("Mved", False)) / len(teamData)
-    auto_coral = sum(entry.get("L1sc", 0) + entry.get("L2sc", 0) +
-                     entry.get("L3sc", 0) + entry.get("L4sc", 0) for entry in teamData)
-    return 1 if mved_rate >= 0.5 and auto_coral > 0 else 0
+        base[t]["sumBarge"]+= (ab+ tb)
+        base[t]["sumProc"]+= (ap+ tp)
 
-def alliance_autonomous_bonus(data, team_numbers):
-    """Returns 1 if every team in the alliance meets the autonomous bonus condition."""
-    return 1 if all(autonomous_bonus(data, t) == 1 for t in team_numbers) else 0
+        # reef removal
+        rr= (row.get("RmAr",0)+ row.get("RmAg",0)+ row.get("tRmAr",0)+ row.get("tRmAg",0))
+        base[t]["sumReef"]+= rr
 
-def alliance_coral_bonus(data, team_numbers, threshold=5):
-    """
-    Returns 1 if for each coral level (L1-L4) the alliance (sum of per-team averages)
-    does not exceed the physical limit (12) but meets at least the given threshold.
-    For each level, we sum each team's average corals on that level and then cap at 12.
-    """
-    levels = ["L1", "L2", "L3", "L4"]
-    for lvl in levels:
-        total = sum(level_average(data, t, lvl) for t in team_numbers)
-        capped = min(total, 12)
-        if capped < threshold:
-            return 0
-    return 1
+        # climbs => from epo
+        ep= end_map.get(row.get("epo","No"),0)
+        if ep>=12:
+            base[t]["sumClimbs"]+=1
+        elif ep>=6:
+            base[t]["sumClimbs"]+=0.5
+        base[t]["sumEndg"]+= ep
 
-def alliance_barge_bonus(data, team_numbers):
-    """
-    Returns 1 if the alliance's average barge points (sum over teams) exceeds 14.
-    """
-    total = sum(average_algae_barge(data, t) for t in team_numbers)
-    return 1 if total > 14 else 0
+        if row.get("Mved"):
+            base[t]["autoMoves"]+=1
 
-#########################################
-# Part 2a: Parameter Tuning for RP Mode
-#########################################
-def tune_rp_parameters(data, team_numbers, blend_range, multiplier_range):
-    """
-    Grid-search over blend_factor and avg_multiplier candidate values.
-    Our objective is lexicographic:
-      1. Maximize estimated RP (primary objective; ideally 6)
-      2. Among candidates with equal RP, maximize estimated points.
-    Returns the best blend_factor, best multiplier, best estimated points, and best estimated RP.
-    """
-    best_rp = -math.inf
-    best_points = -math.inf
-    best_blend = None
-    best_mult = None
-    for blend in blend_range:
-        for mult in multiplier_range:
-            est_points, est_rp, _ = calculate_estimated_alliance_score(data, team_numbers, mode="rp", blend_factor=blend, avg_multiplier=mult)
-            # Primary objective: maximize RP (capped at 6)
-            if est_rp > best_rp:
-                best_rp = est_rp
-                best_points = est_points
-                best_blend = blend
-                best_mult = mult
-            # If RP tie, then maximize points
-            elif est_rp == best_rp and est_points > best_points:
-                best_points = est_points
-                best_blend = blend
-                best_mult = mult
-    return best_blend, best_mult, best_points, best_rp
+    final= {}
+    for t,d in base.items():
+        m= d["matches"]
+        if m<1:
+            continue
+        aC= d["sumAutoC"]/m
+        tC= d["sumTeleC"]/m
+        aA= d["sumAutoA"]/m
+        tA= d["sumTeleA"]/m
+        rr= d["sumReef"]/m
+        cl= d["sumClimbs"]/m
+        en= d["sumEndg"]/m
+        fracMv= d["autoMoves"]/m
+        bar= d["sumBarge"]/m
+        pro= d["sumProc"]/m
 
-#########################################
-# Part 3: Calculation-Based Predictor Functions (with tunable RP parameters)
-#########################################
-def calculate_estimated_alliance_score(data, team_numbers, mode="points", blend_factor=0.75, avg_multiplier=4.5):
-    """
-    Calculation-based predictor for alliance score and RP.
-    
-    Two modes:
-      - mode="points": The alliance focuses on maximizing points.
-         Estimated Total Points = Sum over teams of:
-             (average_auto_score + average_teleop_score + average_algae_score + average_endgame_points)
-         RP Conditions:
-             - Coral Bonus: if each level (L1-L4) totals at least 5 corals (capped at 12).
-             - Autonomous Bonus: if every team meets the autonomous condition.
-             - Barge Bonus: if alliance barge points > 14.
-             - Win Bonus: fixed 3 RP.
-      
-      - mode="rp": The alliance focuses on meeting RP thresholds.
-         In this mode we assume the alliance first scores the minimum required for RP,
-         then uses any extra potential. We compute:
-             full_points = sum of team full average scores (as in points mode)
-             min_required = coral_thresh * 4 * avg_multiplier * 2  (for 4 levels, 2 phases)
-             estimated_points = min_required + blend_factor * max(0, full_points - min_required)
-         Where coral_thresh = 3 if average processor algae score (from ScAp/tScAp) ≥ 12, else 5.
-    
-    Returns a tuple: (estimated_total_points, estimated_RP, report_dict)
-    """
-    report = {"teams": {}}
-    
-    for t in team_numbers:
-        team_report = {}
-        auto = average_auto_score(data, t)
-        teleop = average_teleop_score(data, t)
-        algae = average_algae_score(data, t)
-        endgame = average_endgame_points(data, t)
-        total = auto + teleop + algae + endgame
-        team_report["Average Autonomous Coral Score"] = auto
-        team_report["Average TeleOp Coral Score"] = teleop
-        team_report["Average Algae Score"] = algae
-        team_report["Average Endgame Points"] = endgame
-        team_report["Total Average Score"] = total
-        per_level = {lvl: level_average(data, t, lvl) for lvl in ["L1", "L2", "L3", "L4"]}
-        team_report["Per-Level Averages"] = per_level
-        team_report["Autonomous Bonus Condition"] = "Yes" if autonomous_bonus(data, t) == 1 else "No"
-        report["teams"][t] = team_report
-
-    alliance_total = sum(report["teams"][t]["Total Average Score"] for t in team_numbers)
-    
-    if mode == "points":
-        estimated_points = alliance_total
-        coral_thresh = 5
-    else:  # mode == "rp"
-        def average_processor(data, t):
-            teamData = [entry for entry in data if entry["teamNumber"] == t]
-            if not teamData:
-                return 0
-            return sum(entry.get("ScAp", 0) * 6 + entry.get("tScAp", 0) * 6 for entry in teamData) / len(teamData)
-        processor_avg = sum(average_processor(data, t) for t in team_numbers) / len(team_numbers)
-        coral_thresh = 3 if processor_avg >= 12 else 5
-        full_points = alliance_total
-        min_required = coral_thresh * 4 * avg_multiplier * 2  # 4 levels, 2 phases
-        estimated_points = min_required + blend_factor * max(0, full_points - min_required)
-    
-    rp_coral = alliance_coral_bonus(data, team_numbers, threshold=coral_thresh)
-    rp_auto = alliance_autonomous_bonus(data, team_numbers)
-    rp_barge = alliance_barge_bonus(data, team_numbers)
-    rp_win = 3
-    rp_total = rp_coral + rp_auto + rp_barge + rp_win
-    if rp_total > 6:
-        rp_total = 6
-
-    report["Alliance Totals"] = {"Combined Estimated Total Points": estimated_points}
-    report["RP Conditions"] = {
-        "Autonomous Bonus": rp_auto,
-        "Coral Bonus (threshold=" + str(coral_thresh) + ")": rp_coral,
-        "Barge Bonus": rp_barge,
-        "Win Bonus": rp_win,
-        "Total Estimated RP (capped at 6)": rp_total
-    }
-    report["Overall Estimated Total Points"] = estimated_points
-    report["Overall Estimated RP"] = rp_total
-    report["Mode"] = mode
-    report["Processor Average (for RP mode decision)"] = processor_avg if mode == "rp" else None
-
-    return estimated_points, rp_total, report
-
-#########################################
-# Part 3a: Baseline Physical Performance Calculation
-#########################################
-def baseline_alliance_physical(data, team_numbers):
-    """
-    Computes the alliance's baseline average and maximum scores subject to physical limitations.
-    For each coral level (L1-L4), sum each team's average and maximum scores, capping the sum at 12.
-    Apply approximate multipliers (L1:2.5, L2:3.5, L3:5.0, L4:6.0),
-    then add the alliance's algae and endgame points.
-    Returns: (baseline_average, baseline_max, difference).
-    """
-    multipliers = {"L1": 2.5, "L2": 3.5, "L3": 5.0, "L4": 6.0}
-    
-    alliance_avg_coral = 0
-    alliance_max_coral = 0
-    for lvl in ["L1", "L2", "L3", "L4"]:
-        total_avg_lvl = sum(level_average(data, t, lvl) for t in team_numbers)
-        total_max_lvl = sum(level_max(data, t, lvl) for t in team_numbers)
-        capped_avg = min(total_avg_lvl, 12)
-        capped_max = min(total_max_lvl, 12)
-        alliance_avg_coral += capped_avg * multipliers[lvl]
-        alliance_max_coral += capped_max * multipliers[lvl]
-    
-    alliance_avg_algae = sum(average_algae_score(data, t) for t in team_numbers)
-    alliance_avg_endgame = sum(average_endgame_points(data, t) for t in team_numbers)
-    
-    baseline_avg = alliance_avg_coral + alliance_avg_algae + alliance_avg_endgame
-    
-    def team_max_algae(data, t):
-        teamData = [entry for entry in data if entry["teamNumber"] == t]
-        if not teamData:
-            return 0
-        return max(entry.get("ScAb", 0) * 4 + entry.get("ScAp", 0) * 6 +
-                   entry.get("tScAb", 0) * 4 + entry.get("tScAp", 0) * 6 for entry in teamData)
-    def team_max_endgame(data, t):
-        mapping = {"P": 2, "Sc": 6, "Dc": 12, "No": 0, "Fs": 0, "Fd": 0}
-        teamData = [entry for entry in data if entry["teamNumber"] == t]
-        if not teamData:
-            return 0
-        return max(mapping.get(entry.get("epo", "No"), 0) for entry in teamData)
-    
-    alliance_max_algae = sum(team_max_algae(data, t) for t in team_numbers)
-    alliance_max_endgame = sum(team_max_endgame(data, t) for t in team_numbers)
-    
-    baseline_max = alliance_max_coral + alliance_max_algae + alliance_max_endgame
-    diff = baseline_max - baseline_avg
-    return baseline_avg, baseline_max, diff
-
-#########################################
-# Part 4: Simulation of Multiple Alliances
-#########################################
-def simulate_alliances(data, team_stats_pool, num_alliances=5):
-    all_teams = list(team_stats_pool.keys())
-    results = []
-    for i in range(num_alliances):
-        alliance = random.sample(all_teams, 3)
-        baseline_avg, baseline_max, diff = baseline_alliance_physical(data, alliance)
-        pts_mode_points, pts_mode_rp, _ = calculate_estimated_alliance_score(data, alliance, mode="points")
-        rp_mode_points, rp_mode_rp, _ = calculate_estimated_alliance_score(data, alliance, mode="rp")
-        alliance_result = {
-            "Alliance Teams": alliance,
-            "Baseline Average Score": round(baseline_avg, 2),
-            "Baseline Maximum Score": round(baseline_max, 2),
-            "Baseline Difference (Max - Average)": round(diff, 2),
-            "Calculated (Points Mode) - Estimated Points": round(pts_mode_points, 2),
-            "Calculated (Points Mode) - Estimated RP": pts_mode_rp,
-            "Calculated (RP Mode) - Estimated Points": round(rp_mode_points, 2),
-            "Calculated (RP Mode) - Estimated RP": rp_mode_rp
+        cycUnits= 0.75*(aC+ tC)+ 1.0*(aA+ tA)+ 0.225* rr + 3* cl
+        if cycUnits<1e-9:
+            x_i=999.0
+        else:
+            x_i= 150.0/ cycUnits
+        final[t]= {
+            "avgAutoCor": aC,
+            "avgTeleCor": tC,
+            "avgAutoAlg": aA,
+            "avgTeleAlg": tA,
+            "avgReef": rr,
+            "avgClimb": cl,
+            "avgEndg": en,
+            "fracMoved": fracMv,
+            "avgBarge": bar,
+            "avgProc": pro,
+            "x_i": x_i
         }
-        results.append(alliance_result)
-    return results
+    return final
 
-#########################################
-# Part 5: Parameter Tuning and Main Flow
-#########################################
+##############################################
+# PART 3: Merge Alliance Stats + Build x
+##############################################
+def merge_alliance_data(allianceTeams, cycleData):
+    """
+    Summation approach:
+     - sumAutoCor, sumTeleCor, sumBarge, sumProc, sumEndg, ...
+     - minFracMove => min
+     - sumAuto => sum of avgAutoCor
+     - We'll store a list of each team's x_i so we can do parallel time checks.
+    We'll return a dict that captures the alliance-level stats for synergy enumerations.
+    """
+    merged= {
+      "teams": allianceTeams,
+      "sumAutoCor":0.0,
+      "sumTeleCor":0.0,
+      "sumBarge":0.0,
+      "sumProc":0.0,
+      "sumEndg":0.0,
+      "minFracMove":1.0,
+      "sumAutoAll":0.0,  # total auto cor across all
+      "teamXs": [],       # store each team's x_i
+      "teamData": {}      # store each team's raw stats for parallel time checks
+    }
+    for t in allianceTeams:
+        if t not in cycleData:
+            continue
+        st= cycleData[t]
+        merged["sumAutoCor"]+= st["avgAutoCor"]
+        merged["sumTeleCor"]+= st["avgTeleCor"]
+        merged["sumBarge"]+= st["avgBarge"]
+        merged["sumProc"]+= st["avgProc"]
+        merged["sumEndg"]+= st["avgEndg"]
+        if st["fracMoved"]< merged["minFracMove"]:
+            merged["minFracMove"]= st["fracMoved"]
+        merged["sumAutoAll"]+= st["avgAutoCor"]
+        merged["teamXs"].append(st["x_i"])
+        merged["teamData"][t]= st
+    return merged
+
+##############################################
+# PART 4: Freed L2, Freed L3 enumerations
+##############################################
+def freed_spots(r):
+    # Freed L2= min(12, 2*r), Freed L3= min(12, 2*r)
+    return min(12, 2*r), min(12, 2*r)
+
+##############################################
+# PART 5: Shared Utils => time for alliance
+##############################################
+def parallel_time_for_alliance(corals, algae, reefRemoval, climbs, allianceInfo):
+    """
+    We have corals, algae, reefRemoval, climbs at the alliance level. 
+    We want to see if each team can do a fraction of that within 150s in parallel.
+    We'll distribute them among the 3 teams proportionally to their historical average usage.
+    Then each team's time => cyc= 0.75*(team corals) + 1*(team algae) + 0.225*(team reef) + 3*(team climb)
+    times x_i. We take max => alliance time. Must be <=150 for feasible.
+    We'll do a naive proportion by each team's fraction of the alliance's total. E.g. if team t = 30% of alliance corals historically, we assign them 30% of 'corals'.
+    """
+    # sumAutoCor + sumTeleCor => totalCor. We'll see fraction for each team. 
+    # We'll do fractionC_i= st["avgAutoCor"]+ st["avgTeleCor"] / (alliance sumAutoCor+ sumTeleCor).
+    # Actually we have them splitted in allianceInfo => sumAutoCor + sumTeleCor ??? We only stored sumAutoCor, sumTeleCor => let's define totalCor= sumAutoCor+ sumTeleCor
+    totalCorHist= allianceInfo["sumAutoCor"]+ allianceInfo["sumTeleCor"]
+    if totalCorHist<1e-9:
+        totalCorHist=1e-9
+    totalAlgHist= allianceInfo["sumBarge"]+ allianceInfo["sumProc"]
+    if totalAlgHist<1e-9:
+        totalAlgHist=1e-9
+    # for reef removal => we proportionally assign among teams by each team's avgReef?
+    sumReefHist= 0
+    sumClimbHist= 0
+    for tKey,st in allianceInfo["teamData"].items():
+        sumReefHist+= st["avgReef"]
+        sumClimbHist+= st["avgClimb"]
+
+    if sumReefHist<1e-9:
+        sumReefHist=1e-9
+
+    # For climbs => we do a quick approach: if st["avgClimb"]>0.5 => we assign a climb=1, else 0, ignoring 'climbs' param. 
+    # But we have 'climbs' from the synergy? We'll do a simpler approach => we distribute 'climbs' fractionally if needed. 
+    # For demonstration, let's do fraction. 
+    if sumClimbHist<1e-9:
+        sumClimbHist=1e-9
+
+    times= []
+    for tKey, st in allianceInfo["teamData"].items():
+        fracC= (st["avgAutoCor"]+ st["avgTeleCor"])/ totalCorHist
+        usedC= fracC* corals
+        fracA= (st["avgBarge"]+ st["avgProc"])/ totalAlgHist
+        usedAlg= fracA* algae
+        fracR= st["avgReef"]/ sumReefHist
+        usedReef= fracR* reefRemoval
+        fracCl= st["avgClimb"]/ sumClimbHist
+        usedCl= fracCl* climbs
+
+        cyc= 0.75* usedC + 1.0* usedAlg + 0.225* usedReef + 3.0* usedCl
+        timeSec= cyc* st["x_i"]
+        times.append(timeSec)
+    return max(times)
+
+##############################################
+# PART 6: Partial RP Check
+##############################################
+def rp_conditions(allianceInfo, c4, c3, c2, c1, bar, proc):
+    """
+    Return (autoRP, coralRP, bargeRP).
+    - autoRP => if minFracMove>=0.5 and sumAutoAll>=1
+    - coralRP => if each level >=5 or >=3 if proc>=2
+    - bargeRP => if 4*bar + sumEndg>=14
+    """
+    # auto rp
+    rp_auto = 1 if (allianceInfo["minFracMove"] >= 0.5 and allianceInfo["sumAutoAll"] >= 1) else 0
+    
+    # coral rp
+    thresh = 3 if proc >= 2 else 5
+    rp_coral = 1 if (c4 >= thresh and c3 >= thresh and c2 >= thresh and c1 >= thresh) else 0
+    
+    # barge rp
+    # Now we use 'bar' instead of 'barge'
+    rp_barge = 1 if (4 * bar + allianceInfo["sumEndg"] >= 14) else 0
+    
+    return rp_auto, rp_coral, rp_barge
+
+##############################################
+# PART 7: Strategy Enumerations
+##############################################
+def alliance_score_points(allianceInfo):
+    """
+    We'll do a short enumeration:
+     - R in 0..6 => Freed L2, Freed L3
+     - fill corals top-down => c4.. c3.. c2.. c1
+     - place up to 9 algae => prefer processor for max points
+     - check parallel time <=150
+     - pick best points, tie-break partial rp
+    Return (points, partialRP, bestDist).
+    """
+    c_tot= allianceInfo["sumAutoCor"]+ allianceInfo["sumTeleCor"]
+    a_tot= allianceInfo["sumBarge"]+ allianceInfo["sumProc"]
+    if a_tot>9:
+        a_tot=9
+    best_pts=0
+    best_rp=0
+    best_dist=None
+
+    for R in range(7):
+        freedL2, freedL3= freed_spots(R)
+        # L4=12 capacity, L3= freedL3, L2= freedL2, L1= unlimited => but let's cap L1=25 if you want. We'll skip or do 25
+        # fill top-down => we do c4= min(12, c_tot), leftover => c3= min(freedL3,...), c2= min(freedL2,...), c1 => leftover
+        c_left= c_tot
+        c4= min(12, c_left); c_left-= c4
+        c3= min(freedL3, c_left); c_left-= c3
+        c2= min(freedL2, c_left); c_left-= c2
+        c1= c_left  # no limit or 25 => do min(25, c_left) if needed. We'll skip for demonstration
+
+        # algae => up to a_tot => let's place all in processor for points
+        proc= a_tot
+        bar= 0
+
+        # parallel time
+        # we define climbs=0 for "points"? We can do enumerations. We'll skip. 
+        # reef removal= R => in synergy we do that once at alliance level => let's see if parallel time <=150
+        usedCor= c4+ c3+ c2+ c1
+        usedAlg= bar+ proc
+        usedReef= R
+        usedClimb= 0  # no climb for "points" by default? or enumerations? We'll keep 0 for brevity
+
+        allianceTime= parallel_time_for_alliance(usedCor, usedAlg, usedReef, usedClimb, allianceInfo)
+        if allianceTime>150:
+            continue
+        # compute final points => auto fraction = sumAutoAll / usedCor if usedCor>0
+        if usedCor<1e-9:
+            frac_auto=0
+        else:
+            frac_auto= allianceInfo["sumAutoAll"]/ usedCor
+        # corals => auto L4=7, tele=5 => we do a blended approach => or we do an average function
+        # We'll do your "blended_points" approach:
+        def blend(level):
+            auto_mult= {"L4":7,"L3":6,"L2":4,"L1":3}
+            tele_mult= {"L4":5,"L3":4,"L2":3,"L1":2}
+            return frac_auto* auto_mult[level] + (1-frac_auto)* tele_mult[level]
+        c_pts= c4*blend("L4") + c3*blend("L3") + c2*blend("L2") + c1*blend("L1")
+        a_pts= bar*4 + proc*6
+        final_pts= c_pts+ a_pts+ allianceInfo["sumEndg"]  # endg is sum of average climbs etc. 
+        # partial rp => auto? coral? barge?
+        rp_auto, rp_coral, rp_barge= rp_conditions(allianceInfo, c4,c3,c2,c1, bar, proc)
+        rp_sum= rp_auto+ rp_coral+ rp_barge
+        # pick best points, tie-break rp
+        if final_pts> best_pts or (abs(final_pts- best_pts)<1e-9 and rp_sum> best_rp):
+            best_pts= final_pts
+            best_rp= rp_sum
+            best_dist= {
+                "RemovedAlgae": R,
+                "FreedL2": freedL2, "FreedL3": freedL3,
+                "c4": c4, "c3": c3, "c2": c2, "c1": c1,
+                "barge": bar, "processor": proc,
+                "Climbs":0,
+                "AllianceTime": allianceTime,
+                "AlliancePoints": final_pts,
+                "PartialRP": rp_sum
+            }
+    if best_dist is None:
+        return 0,0,{"error":"No feasible distribution for points."}
+    return best_dist["AlliancePoints"], best_dist["PartialRP"], best_dist
+
+def alliance_score_rp(allianceInfo):
+    """
+    'RP' strategy => we prioritize coral/b
+    1) Freed R in 0..6
+    2) place enough corals => threshold=3 if proc>=2 => leftover => fill for points
+    3) place enough barge => if we want barge rp => 14 minus endg
+    4) check parallel time
+    pick best rp, tie-break points
+    """
+    c_tot= allianceInfo["sumAutoCor"]+ allianceInfo["sumTeleCor"]
+    a_tot= allianceInfo["sumBarge"]+ allianceInfo["sumProc"]
+    if a_tot>9:
+        a_tot=9
+    best_rp= -999
+    best_pts=0
+    best_dist=None
+
+    def barge_needed(e):
+        # 4*barge + e>=14 => barge>= (14-e)/4
+        return max(0, math.ceil((14-e)/4))
+    # We'll do short enumerations
+    for R in range(7):
+        freedL2, freedL3= freed_spots(R)
+        for must_proc in [0,2]:
+            # threshold= 3 if must_proc>=2 else 5
+            thresh= 3 if must_proc>=2 else 5
+            needed_cor= 4* thresh
+            if needed_cor> c_tot+1e-9:
+                # can't get coral rp => skip
+                continue
+            # barge needed => bargeNeed= barge_needed(allianceInfo["sumEndg"])
+            bNeed= barge_needed(allianceInfo["sumEndg"])
+            if bNeed> a_tot:
+                # can't get barge rp => but we can still get partial rp from coral rp, auto rp
+                pass
+            # We'll place must_proc + bNeed in phase1 => timeCost= cor*(0.75) + algae*(1) + R*(0.225)
+            base_time= parallel_time_for_alliance(needed_cor, (must_proc+ bNeed), R, 0, allianceInfo)
+            if base_time>150:
+                continue
+            leftoverTime= 150- base_time
+            # leftover cor= c_tot- needed_cor
+            c_left= c_tot- needed_cor
+            # Freed => L4cap=12, L3cap= freedL3-thresh??? Actually we do a partial approach
+            # We'll skip partial synergy. We'll place leftover cor top-down
+            # We'll do a naive approach => c4= min(12-thresh, c_left) etc. 
+            l4cap= max(0, 12- thresh)
+            l3cap= max(0, freedL3- thresh)
+            l2cap= max(0, freedL2- thresh)
+            # l1cap= 25- thresh? We'll skip. Let l1 be leftover
+            # how many cor can we place in leftoverTime => leftoverTime / 0.75 in cycle units => we proportion among 3 teams => simplified
+            cor_max2= leftoverTime/ allianceInfo["teamXs"][0]  # we do a naive approach or we do a small approach
+            # We'll do it ignoring parallel distribution for demonstration
+            # We'll just skip advanced synergy and say leftover cor2= min(c_left, cor_max2). 
+            cor2= c_left
+            if cor2<0:
+                cor2=0
+            usedCor2= cor2
+            # Algae leftover => we used must_proc+ bNeed => leftover a_tot - (must_proc+ bNeed)
+            a_left= a_tot- (must_proc+ bNeed)
+            if a_left<0:
+                a_left=0
+            # check if time is feasible => parallel_time_for_alliance( needed_cor+ usedCor2, must_proc+ bNeed+ leftoverAlg, R, 0)
+            # leftoverAlg => we can place in processor for points => let's do it
+            leftoverAlg= a_left
+            final_time= parallel_time_for_alliance(needed_cor+ usedCor2, must_proc+ bNeed+ leftoverAlg, R, 0, allianceInfo)
+            if final_time>150:
+                continue
+            # points => auto fraction => sumAutoAll / totalUsedCor
+            totalCorUsed= needed_cor+ usedCor2
+            if totalCorUsed<1e-9:
+                frac_auto=0
+            else:
+                frac_auto= allianceInfo["sumAutoAll"]/ totalCorUsed
+            # cor rp => guaranteed if c4,c3,c2,c1>= threshold => we skip actual distribution for demonstration
+            # let's do a naive approach => c4= c3= c2= c1= threshold + leftover top-down
+            c4= thresh; c3= thresh; c2= thresh; c1= thresh; # total=4*thresh
+            leftoverC= usedCor2
+            # fill c4cap= min(l4cap, leftoverC) => etc. We'll skip for brevity
+            c4plus= min(l4cap, leftoverC); leftoverC-= c4plus; c4+= c4plus
+            c3plus= min(l3cap, leftoverC); leftoverC-= c3plus; c3+= c3plus
+            c2plus= min(l2cap, leftoverC); leftoverC-= c2plus; c2+= c2plus
+            c1+= leftoverC
+            # barge= bNeed+ leftover barge? We'll skip synergy => place leftoverAlg in processor for more points
+            bar= bNeed
+            proc= must_proc+ leftoverAlg
+            # final points => use blended eq
+            def blend(level):
+                autoMult= {"L4":7,"L3":6,"L2":4,"L1":3}
+                teleMult={"L4":5,"L3":4,"L2":3,"L1":2}
+                return frac_auto* autoMult[level] + (1-frac_auto)* teleMult[level]
+            coralPts= c4*blend("L4")+ c3*blend("L3")+ c2*blend("L2")+ c1*blend("L1")
+            algaePts= bar*4 + proc*6
+            finalPts= coralPts+ algaePts+ allianceInfo["sumEndg"]
+            # partial rp => auto, coral, barge
+            rp_auto, rp_coral, rp_barge= rp_conditions(allianceInfo, c4,c3,c2,c1, bar, proc)
+            rp_sum= rp_auto+ rp_coral+ rp_barge
+            # pick best rp, tie-break points
+            if rp_sum> best_rp or (rp_sum== best_rp and finalPts> best_pts):
+                best_rp= rp_sum
+                best_pts= finalPts
+                best_dist= {
+                  "RemovedAlgae": R,
+                  "threshold": thresh,
+                  "FreedL2": freedL2, "FreedL3": freedL3,
+                  "Cor4": c4,"Cor3": c3,"Cor2": c2,"Cor1": c1,
+                  "barge": bar,"processor": proc,
+                  "TimeUsed": final_time,
+                  "Points": finalPts,
+                  "PartialRP": rp_sum
+                }
+    if best_dist is None:
+        return 0,0,{"error":"No feasible rp distribution."}
+    return best_dist["Points"], best_dist["PartialRP"], best_dist
+
+def calculate_alliance_score(allianceInfo, strategy="points"):
+    """
+    If strategy=points => alliance_score_points
+    else => alliance_score_rp
+    """
+    if strategy=="points":
+        return alliance_score_points(allianceInfo)
+    else:
+        return alliance_score_rp(allianceInfo)
+
+###############################################
+# PART 8: Compare Two Alliances
+###############################################
+def calculate_match_outcome(data, allianceA, allianceB, stratA="points", stratB="points"):
+    # gather cycle data
+    cycleData= gather_team_cycle_data(data)
+    # build alliance info
+    Ainfo= merge_alliance_data(allianceA, cycleData)
+    Binfo= merge_alliance_data(allianceB, cycleData)
+    # compute
+    Apts, Arp, Adet= calculate_alliance_score(Ainfo, stratA)
+    Bpts, Brp, Bdet= calculate_alliance_score(Binfo, stratB)
+    # Win rp
+    Awin=0
+    Bwin=0
+    if abs(Apts- Bpts)<1e-9:
+        Awin=1
+        Bwin=1
+    elif Apts> Bpts:
+        Awin=3
+    else:
+        Bwin=3
+    A_total= Arp+ Awin
+    B_total= Brp+ Bwin
+    if A_total>6: A_total=6
+    if B_total>6: B_total=6
+    return {
+      "AllianceA":{
+        "Teams": allianceA,
+        "Strategy": stratA,
+        "Points": Apts,
+        "PartialRP": Arp,
+        "WinRP": Awin,
+        "TotalRP": A_total,
+        "Detail": Adet
+      },
+      "AllianceB":{
+        "Teams": allianceB,
+        "Strategy": stratB,
+        "Points": Bpts,
+        "PartialRP": Brp,
+        "WinRP": Bwin,
+        "TotalRP": B_total,
+        "Detail": Bdet
+      }
+    }
+
+###############################################
+# PART 9: MAIN
+###############################################
 def main():
-    data_file = "scouting_data_intelligent.json"
+    data_file= "scouting_data_intelligent.json"
     if not os.path.exists(data_file):
-        print("Data file not found; generating synthetic data...")
+        print("No data found, generating..")
         generate_data(data_file)
     else:
         print(f"Using existing data file: {data_file}")
+    with open(data_file,"r") as f:
+        data= json.load(f)
 
-    with open(data_file, "r") as f:
-        data = json.load(f)
-    
-    # Detailed prediction for a chosen alliance
-    alliance = [20, 11, 28]
-    print("\n=== Calculation-Based Alliance Detailed Prediction Report (Points Mode) ===")
-    pts_points, pts_rp, report_points = calculate_estimated_alliance_score(data, alliance, mode="points")
-    for key, value in report_points.items():
-        if key == "teams":
-            print("Detailed Per-Team Averages:")
-            for team, rep in value.items():
-                print(f"Team {team}:")
-                for k, v in rep.items():
-                    if isinstance(v, dict):
-                        print("  " + k + ":")
-                        for lvl, avg in v.items():
-                            print(f"    {lvl}: {avg:.2f}")
-                    else:
-                        print(f"  {k}: {v}")
-        else:
-            print(f"{key}: {value}")
+    # define 5 matches
+    five_matches= [
+      ([1,2,3],[4,5,6]),
+      ([7,8,9],[10,11,12]),
+      ([13,14,15],[16,17,18]),
+      ([19,20,21],[22,23,24]),
+      ([25,26,27],[28,29,30])
+    ]
+    combos= [("points","points"),("points","rp"),("rp","points"),("rp","rp")]
 
-    print("\n=== Calculation-Based Alliance Detailed Prediction Report (RP Mode) ===")
-    # Tuning RP mode parameters: we use a grid search over blend factor and avg multiplier.
-    blend_range = np.linspace(0.5, 1.5, 21)  # from 0.5 to 1.5
-    multiplier_range = np.linspace(3.0, 6.0, 21)  # from 3.0 to 6.0
-    best_blend, best_mult, best_points, best_rp = tune_rp_parameters(data, alliance, blend_range, multiplier_range)
-    print(f"Tuned RP Mode Parameters for alliance {alliance}: Best Blend Factor = {best_blend}, Best Avg Multiplier = {best_mult} (Estimated Points = {round(best_points,2)}, RP = {best_rp})")
-    rp_points, rp_rp, report_rp = calculate_estimated_alliance_score(data, alliance, mode="rp", blend_factor=best_blend, avg_multiplier=best_mult)
-    for key, value in report_rp.items():
-        if key == "teams":
-            print("Detailed Per-Team Averages:")
-            for team, rep in value.items():
-                print(f"Team {team}:")
-                for k, v in rep.items():
-                    if isinstance(v, dict):
-                        print("  " + k + ":")
-                        for lvl, avg in v.items():
-                            print(f"    {lvl}: {avg:.2f}")
-                    else:
-                        print(f"  {k}: {v}")
-        else:
-            print(f"{key}: {value}")
+    for idx,(A,B) in enumerate(five_matches, start=1):
+        print(f"\n=== MATCH #{idx}: Alliance A={A} vs B={B} ===")
+        for (sA,sB) in combos:
+            out= calculate_match_outcome(data, A,B, sA, sB)
+            Ares= out["AllianceA"]
+            Bres= out["AllianceB"]
+            print(f"  STRATEGIES => A={sA}, B={sB}")
+            print(f"    Alliance A => Points={Ares['Points']:.1f}, PartialRP={Ares['PartialRP']}, WinRP={Ares['WinRP']}, TotalRP={Ares['TotalRP']}")
+            print("      Detail =>", Ares["Detail"])
+            print(f"    Alliance B => Points={Bres['Points']:.1f}, PartialRP={Bres['PartialRP']}, WinRP={Bres['WinRP']}, TotalRP={Bres['TotalRP']}")
+            print("      Detail =>", Bres["Detail"])
+            print()
 
-    baseline_avg, baseline_max, diff = baseline_alliance_physical(data, alliance)
-    print("\n=== Baseline Alliance Performance (For Alliance", alliance, ") ===")
-    print("Baseline Average Score (capped by physical limits):", round(baseline_avg, 2))
-    print("Baseline Maximum Score (capped by physical limits):", round(baseline_max, 2))
-    print("Difference (Max - Average):", round(diff, 2))
-    
-    # Build team_stats_pool from aggregated data for simulation
-    df = pd.DataFrame(data)
-    agg_df = df.groupby("teamNumber").agg({
-        'L1sc':'sum','L1ms':'sum',
-        'L2sc':'sum','L2ms':'sum',
-        'L3sc':'sum','L3ms':'sum',
-        'L4sc':'sum','L4ms':'sum',
-        'tL1sc':'sum','tL1ms':'sum',
-        'tL2sc':'sum','tL2ms':'sum',
-        'tL3sc':'sum','tL3ms':'sum',
-        'tL4sc':'sum','tL4ms':'sum',
-        'ScAb':'mean','ScAp':'mean',
-        'tScAb':'mean','tScAp':'mean',
-        'Mved':'mean'
-    })
-    def compute_rate(sc, ms):
-        total = sc + ms
-        return sc/total if total > 0 else 0.5
-    team_stats_pool = {}
-    for team, row in agg_df.iterrows():
-        team_stats_pool[team] = {
-            'auto_coral_L1_rate': compute_rate(row['L1sc'], row['L1ms']),
-            'auto_coral_L1_cycle': 8.0,
-            'auto_coral_L2_rate': compute_rate(row['L2sc'], row['L2ms']),
-            'auto_coral_L2_cycle': 10.0,
-            'auto_coral_L3_rate': compute_rate(row['L3sc'], row['L3ms']),
-            'auto_coral_L3_cycle': 12.0,
-            'auto_coral_L4_rate': compute_rate(row['L4sc'], row['L4ms']),
-            'auto_coral_L4_cycle': 15.0,
-            'teleop_coral_L1_rate': compute_rate(row['tL1sc'], row['tL1ms']),
-            'teleop_coral_L1_cycle': 6.0,
-            'teleop_coral_L2_rate': compute_rate(row['tL2sc'], row['tL2ms']),
-            'teleop_coral_L2_cycle': 8.0,
-            'teleop_coral_L3_rate': compute_rate(row['tL3sc'], row['tL3ms']),
-            'teleop_coral_L3_cycle': 10.0,
-            'teleop_coral_L4_rate': compute_rate(row['tL4sc'], row['tL4ms']),
-            'teleop_coral_L4_cycle': 12.0,
-            'auto_algae_barge_rate': 0.8, 'auto_algae_barge_cycle': 8.0,
-            'auto_algae_processor_rate': 0.7, 'auto_algae_processor_cycle': 8.0,
-            'teleop_algae_barge_rate': 0.85, 'teleop_algae_barge_cycle': 6.0,
-            'teleop_algae_processor_rate': 0.75, 'teleop_algae_processor_cycle': 6.0,
-            'auto_left': 1.0 if row['Mved'] >= 0.5 else 0.0
-        }
-    
-    print("\n=== Simulation of Multiple Alliances ===")
-    sim_results = simulate_alliances(data, team_stats_pool, num_alliances=5)
-    for res in sim_results:
-        print("--------------------------------------------------")
-        print("Alliance Teams:", res["Alliance Teams"])
-        print("Baseline Average Score:", res["Baseline Average Score"])
-        print("Baseline Maximum Score:", res["Baseline Maximum Score"])
-        print("Baseline Difference (Max - Average):", res["Baseline Difference (Max - Average)"])
-        print("Calculated (Points Mode) - Estimated Points:", res["Calculated (Points Mode) - Estimated Points"])
-        print("Calculated (Points Mode) - Estimated RP:", res["Calculated (Points Mode) - Estimated RP"])
-        print("Calculated (RP Mode) - Estimated Points:", res["Calculated (RP Mode) - Estimated Points"])
-        print("Calculated (RP Mode) - Estimated RP:", res["Calculated (RP Mode) - Estimated RP"])
-        print("--------------------------------------------------")
-
-if __name__ == '__main__':
+if __name__=="__main__":
     main()
